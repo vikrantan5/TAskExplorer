@@ -1,24 +1,58 @@
-import React, { useMemo, useEffect } from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
+import React, { useMemo, useEffect, useState } from "react";
+import { View, StyleSheet, ScrollView, Dimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle } from "react-native-svg";
-import Animated, { useSharedValue, useAnimatedStyle, withTiming } from "react-native-reanimated";
+import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeIn } from "react-native-reanimated";
+import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
 import { useTaskContext } from "@/context/TaskContext";
+import { supabase } from "@/lib/supabase";
+import { authService } from "@/lib/supabase-auth";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+
+const screenWidth = Dimensions.get("window").width;
 
 export default function AnalyticsScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
   const { categories, tasks } = useTaskContext();
+  const [analyticsHistory, setAnalyticsHistory] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
   const surfaceColor = useThemeColor({}, "icon");
   const colors = Colors[colorScheme ?? "light"];
+
+  // Load analytics history
+  useEffect(() => {
+    loadAnalyticsHistory();
+  }, []);
+
+  const loadAnalyticsHistory = async () => {
+    try {
+      const user = await authService.getCurrentUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("analytics_history")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: false })
+        .limit(7);
+
+      if (error) throw error;
+      setAnalyticsHistory(data || []);
+    } catch (error) {
+      console.error("Error loading analytics history:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Calculate daily stats
   const dailyStats = useMemo(() => {
@@ -61,7 +95,15 @@ export default function AnalyticsScreen() {
     });
   }, [dailyStats.percentage]);
 
-  const ProgressRing = ({ progress, size = 200, strokeWidth = 12 }: { progress: number; size?: number; strokeWidth?: number }) => {
+  const ProgressRing = ({
+    progress,
+    size = 220,
+    strokeWidth = 16,
+  }: {
+    progress: number;
+    size?: number;
+    strokeWidth?: number;
+  }) => {
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
     const strokeDashoffset = circumference - (progress / 100) * circumference;
@@ -76,10 +118,11 @@ export default function AnalyticsScreen() {
           cy={size / 2}
           r={radius}
           strokeWidth={strokeWidth}
+          opacity={0.3}
         />
         {/* Progress circle */}
         <Circle
-          stroke={accentColor}
+          stroke="url(#gradient)"
           fill="none"
           cx={size / 2}
           cy={size / 2}
@@ -91,7 +134,70 @@ export default function AnalyticsScreen() {
           rotation="-90"
           origin={`${size / 2}, ${size / 2}`}
         />
+        <defs>
+          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={accentColor} />
+            <stop offset="100%" stopColor="#5856D6" />
+          </linearGradient>
+        </defs>
       </Svg>
+    );
+  };
+
+  const WeeklyChart = () => {
+    const chartWidth = screenWidth - Spacing.lg * 2;
+    const chartHeight = 180;
+    const barWidth = (chartWidth - 60) / 7;
+    const maxHeight = chartHeight - 40;
+
+    const weekData = analyticsHistory.slice(0, 7).reverse();
+
+    return (
+      <View style={styles.chartContainer}>
+        <Svg width={chartWidth} height={chartHeight}>
+          {weekData.map((day, index) => {
+            const barHeight = (day.completion_percentage / 100) * maxHeight;
+            const x = 30 + index * barWidth + barWidth / 4;
+            const y = chartHeight - 20 - barHeight;
+
+            return (
+              <React.Fragment key={index}>
+                {/* Bar */}
+                <Line
+                  x1={x}
+                  y1={chartHeight - 20}
+                  x2={x}
+                  y2={y}
+                  stroke={day.completion_percentage >= 80 ? "#34C759" : accentColor}
+                  strokeWidth={barWidth / 2}
+                  strokeLinecap="round"
+                />
+                {/* Day label */}
+                <SvgText
+                  x={x}
+                  y={chartHeight - 5}
+                  fontSize="10"
+                  fill={surfaceColor}
+                  textAnchor="middle"
+                >
+                  {new Date(day.date).toLocaleDateString("en-US", { weekday: "short" }).substring(0, 1)}
+                </SvgText>
+                {/* Percentage label */}
+                <SvgText
+                  x={x}
+                  y={y - 5}
+                  fontSize="10"
+                  fill={textColor}
+                  textAnchor="middle"
+                  fontWeight="bold"
+                >
+                  {day.completion_percentage}%
+                </SvgText>
+              </React.Fragment>
+            );
+          })}
+        </Svg>
+      </View>
     );
   };
 
@@ -108,11 +214,19 @@ export default function AnalyticsScreen() {
       width: `${animatedWidth.value}%`,
     }));
 
+    const getGradientColors = (percentage: number) => {
+      if (percentage >= 80) return ["#11998e", "#38ef7d"];
+      if (percentage >= 50) return ["#667eea", "#764ba2"];
+      return ["#f093fb", "#f5576c"];
+    };
+
     return (
-      <View style={styles.progressBarContainer}>
+      <Animated.View style={styles.progressBarContainer} entering={FadeIn}>
         <View style={styles.progressBarHeader}>
-          <ThemedText type="default">{title}</ThemedText>
-          <ThemedText type="default" style={{ color: surfaceColor, fontSize: 12 }}>
+          <ThemedText type="default" style={{ fontSize: 15 }}>
+            {title}
+          </ThemedText>
+          <ThemedText type="default" style={{ color: surfaceColor, fontSize: 13 }}>
             {completed}/{total}
           </ThemedText>
         </View>
@@ -122,20 +236,19 @@ export default function AnalyticsScreen() {
             { backgroundColor: colors.surface, borderColor: colors.divider },
           ]}
         >
-          <Animated.View
-            style={[
-              styles.progressBarFill,
-              {
-                backgroundColor: percentage >= 80 ? colors.success || "#34C759" : accentColor,
-              },
-              animatedStyle,
-            ]}
-          />
+          <Animated.View style={[styles.progressBarFill, animatedStyle]}>
+            <LinearGradient
+              colors={getGradientColors(percentage)}
+              style={{ flex: 1, borderRadius: BorderRadius.sm }}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+            />
+          </Animated.View>
         </View>
-        <ThemedText type="default" style={{ color: surfaceColor, fontSize: 12, marginTop: Spacing.sm }}>
-          {percentage}%
+        <ThemedText type="default" style={{ color: surfaceColor, fontSize: 12, marginTop: 4 }}>
+          {percentage}% complete
         </ThemedText>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -145,6 +258,13 @@ export default function AnalyticsScreen() {
     if (percentage >= 50) return "💪 You're doing well! Almost there!";
     if (percentage > 0) return "🚀 You're making progress!";
     return "📝 Start by completing your first task!";
+  };
+
+  const getMotivationalColor = (percentage: number) => {
+    if (percentage === 100) return ["#11998e", "#38ef7d"];
+    if (percentage >= 80) return ["#667eea", "#764ba2"];
+    if (percentage >= 50) return ["#f093fb", "#f5576c"];
+    return ["#4facfe", "#00f2fe"];
   };
 
   return (
@@ -158,84 +278,107 @@ export default function AnalyticsScreen() {
       ]}
     >
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <ThemedText type="title" style={{ fontSize: 28, paddingHorizontal: Spacing.lg }}>
+        <ThemedText type="title" style={{ fontSize: 32, paddingHorizontal: Spacing.lg, fontWeight: "bold" }}>
           Analytics
         </ThemedText>
 
         {/* Today's Summary */}
         <View style={[styles.section, { paddingHorizontal: Spacing.lg }]}>
-          <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg }}>
-            Today's Summary
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg, fontSize: 20 }}>
+            Today's Progress
           </ThemedText>
 
           <View style={styles.progressRingContainer}>
             <ProgressRing progress={dailyStats.percentage} />
             <View style={styles.progressRingText}>
-              <ThemedText type="title" style={{ fontSize: 32 }}>
+              <ThemedText type="title" style={{ fontSize: 48, fontWeight: "bold" }}>
                 {dailyStats.percentage}%
               </ThemedText>
-              <ThemedText type="default" style={{ color: surfaceColor }}>
+              <ThemedText type="default" style={{ color: surfaceColor, fontSize: 16 }}>
                 Complete
               </ThemedText>
             </View>
           </View>
 
           <View style={styles.statsGrid}>
-            <View
-              style={[
-                styles.statCard,
-                {
-                  backgroundColor: colors.success || "#34C759",
-                  opacity: 0.1,
-                },
-              ]}
+            <Animated.View
+              style={[styles.statCard]}
+              entering={FadeIn.delay(100)}
             >
-              <ThemedText type="subtitle" style={{ fontSize: 24, color: colors.success || "#34C759" }}>
-                {dailyStats.completed}
-              </ThemedText>
-              <ThemedText type="default" style={{ color: colors.success || "#34C759" }}>
-                Completed
-              </ThemedText>
-            </View>
+              <LinearGradient
+                colors={["#11998e", "#38ef7d"]}
+                style={styles.statCardInner}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <MaterialIcons name="check-circle" size={32} color="#fff" />
+                <ThemedText type="subtitle" style={{ fontSize: 28, color: "#fff", marginTop: 8 }}>
+                  {dailyStats.completed}
+                </ThemedText>
+                <ThemedText type="default" style={{ color: "rgba(255,255,255,0.9)", fontSize: 14 }}>
+                  Completed
+                </ThemedText>
+              </LinearGradient>
+            </Animated.View>
 
-            <View
-              style={[
-                styles.statCard,
-                {
-                  backgroundColor: colors.warning || "#FF9500",
-                  opacity: 0.1,
-                },
-              ]}
+            <Animated.View
+              style={[styles.statCard]}
+              entering={FadeIn.delay(200)}
             >
-              <ThemedText type="subtitle" style={{ fontSize: 24, color: colors.warning || "#FF9500" }}>
-                {dailyStats.missed}
-              </ThemedText>
-              <ThemedText type="default" style={{ color: colors.warning || "#FF9500" }}>
-                Missed
-              </ThemedText>
-            </View>
+              <LinearGradient
+                colors={["#f093fb", "#f5576c"]}
+                style={styles.statCardInner}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <MaterialIcons name="pending-actions" size={32} color="#fff" />
+                <ThemedText type="subtitle" style={{ fontSize: 28, color: "#fff", marginTop: 8 }}>
+                  {dailyStats.missed}
+                </ThemedText>
+                <ThemedText type="default" style={{ color: "rgba(255,255,255,0.9)", fontSize: 14 }}>
+                  Remaining
+                </ThemedText>
+              </LinearGradient>
+            </Animated.View>
           </View>
 
-          <View
-            style={[
-              styles.motivationalCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.divider,
-              },
-            ]}
+          <LinearGradient
+            colors={getMotivationalColor(dailyStats.percentage)}
+            style={styles.motivationalCard}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <ThemedText type="defaultSemiBold" style={{ fontSize: 16 }}>
+            <ThemedText type="defaultSemiBold" style={{ fontSize: 16, color: "#fff", textAlign: "center" }}>
               {getMotivationalMessage(dailyStats.percentage)}
             </ThemedText>
-          </View>
+          </LinearGradient>
         </View>
+
+        {/* Weekly Progress */}
+        {analyticsHistory.length > 0 && (
+          <View style={[styles.section, { paddingHorizontal: Spacing.lg }]}>
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg, fontSize: 20 }}>
+              Weekly Progress
+            </ThemedText>
+            <View
+              style={[
+                styles.chartWrapper,
+                {
+                  backgroundColor: colors.surface,
+                  borderColor: colors.divider,
+                },
+              ]}
+            >
+              <WeeklyChart />
+            </View>
+          </View>
+        )}
 
         {/* Category Breakdown */}
         {categoryStats.length > 0 && (
           <View style={[styles.section, { paddingHorizontal: Spacing.lg }]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg }}>
-              Category Breakdown
+            <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg, fontSize: 20 }}>
+              Category Performance
             </ThemedText>
 
             {categoryStats.map((stat) => (
@@ -253,9 +396,12 @@ export default function AnalyticsScreen() {
         {/* Empty State */}
         {tasks.length === 0 && (
           <View style={styles.emptyState}>
-            <ThemedText type="subtitle">No tasks yet</ThemedText>
-            <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.sm }}>
-              Create tasks to see your analytics
+            <MaterialIcons name="assessment" size={64} color={surfaceColor} />
+            <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
+              No tasks yet
+            </ThemedText>
+            <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.sm, textAlign: "center" }}>
+              Create tasks to see your analytics and track your progress
             </ThemedText>
           </View>
         )}
@@ -273,13 +419,15 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: Spacing.xl,
+    marginTop: Spacing.xl,
   },
   progressRingContainer: {
     alignItems: "center",
     marginBottom: Spacing.xl,
+    marginTop: Spacing.lg,
   },
   progressRing: {
-    marginBottom: -60,
+    marginBottom: -80,
   },
   progressRingText: {
     alignItems: "center",
@@ -293,14 +441,41 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     borderRadius: BorderRadius.lg,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  statCardInner: {
     padding: Spacing.lg,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 140,
   },
   motivationalCard: {
     borderRadius: BorderRadius.lg,
-    borderWidth: 1,
     padding: Spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  chartWrapper: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 1,
+    padding: Spacing.md,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  chartContainer: {
     alignItems: "center",
     justifyContent: "center",
   },
@@ -314,18 +489,19 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   progressBarBackground: {
-    height: 8,
-    borderRadius: BorderRadius.sm,
+    height: 12,
+    borderRadius: BorderRadius.md,
     borderWidth: 1,
     overflow: "hidden",
   },
   progressBarFill: {
     height: "100%",
-    borderRadius: BorderRadius.sm,
+    borderRadius: BorderRadius.md,
   },
   emptyState: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,
+    paddingHorizontal: Spacing.lg,
   },
 });
