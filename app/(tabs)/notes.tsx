@@ -28,7 +28,8 @@ export default function NotesScreen() {
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
-  const surfaceColor = useThemeColor({}, "icon");
+  const textSecondary = Colors[colorScheme ?? "light"].textSecondary;
+  const dangerColor = Colors[colorScheme ?? "light"].danger;
   const colors = Colors[colorScheme ?? "light"];
 
   const handleAddNote = async () => {
@@ -80,7 +81,7 @@ export default function NotesScreen() {
             </ThemedText>
             <ThemedText
               type="default"
-              style={{ color: surfaceColor, marginTop: Spacing.sm, fontSize: 12 }}
+              style={{ color: textSecondary, marginTop: Spacing.sm, fontSize: 12 }}
             >
               {formatDate(note.createdAt)}
             </ThemedText>
@@ -90,7 +91,7 @@ export default function NotesScreen() {
             onPress={() => deleteNote(note.id)}
             style={styles.deleteButton}
           >
-            <MaterialIcons name="close" size={20} color={colors.warning || "#FF9500"} />
+            <MaterialIcons name="close" size={20} color={dangerColor} />
           </Pressable>
         </Pressable>
       </Animated.View>
@@ -125,11 +126,11 @@ export default function NotesScreen() {
 
       {notes.length === 0 ? (
         <View style={styles.emptyState}>
-          <MaterialIcons name="note" size={48} color={surfaceColor} />
+          <MaterialIcons name="note" size={48} color={textSecondary} />
           <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
             No notes yet
           </ThemedText>
-          <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.sm }}>
+          <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm }}>
             Create a note to get started
           </ThemedText>
         </View>
@@ -178,7 +179,7 @@ export default function NotesScreen() {
                 },
               ]}
               placeholder="Write your note here..."
-              placeholderTextColor={surfaceColor}
+              placeholderTextColor={textSecondary}
               value={newNoteContent}
               onChangeText={setNewNoteContent}
               multiline
@@ -242,6 +243,11 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.md,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   noteContent: {
     flex: 1,

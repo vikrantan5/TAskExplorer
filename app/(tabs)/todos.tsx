@@ -32,7 +32,9 @@ export default function TodosScreen() {
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
-  const surfaceColor = useThemeColor({}, "icon");
+  const textSecondary = Colors[colorScheme ?? "light"].textSecondary;
+  const surfaceColor = Colors[colorScheme ?? "light"].surface;
+  const dangerColor = Colors[colorScheme ?? "light"].danger;
   const colors = Colors[colorScheme ?? "light"];
 
   const toggleCategoryExpanded = useCallback((categoryId: string) => {
@@ -89,7 +91,7 @@ export default function TodosScreen() {
           <ThemedText type="subtitle" style={{ fontSize: 18 }}>
             {category.title}
           </ThemedText>
-          <ThemedText type="default" style={{ color: surfaceColor, fontSize: 12 }}>
+          <ThemedText type="default" style={{ color: textSecondary, fontSize: 12 }}>
             {completedCount}/{categoryTasks.length} completed
           </ThemedText>
         </View>
@@ -109,8 +111,11 @@ export default function TodosScreen() {
           style={[
             styles.taskItem,
             {
-              backgroundColor: task.isCompleted ? colors.surface : colors.background,
+              backgroundColor: task.isCompleted ? colors.surface : colors.card,
               borderLeftColor: task.isDaily ? colors.warning : accentColor,
+              borderColor: colors.cardBorder,
+              borderWidth: 1,
+              borderLeftWidth: 4,
             },
           ]}
           onPress={() => toggleTask(task.id)}
@@ -153,7 +158,7 @@ export default function TodosScreen() {
             onPress={() => deleteTask(task.id)}
             style={styles.deleteButton}
           >
-            <MaterialIcons name="close" size={20} color={colors.warning} />
+            <MaterialIcons name="close" size={20} color={dangerColor} />
           </Pressable>
         </Pressable>
       </Animated.View>
@@ -185,11 +190,11 @@ export default function TodosScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {categories.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialIcons name="inbox" size={48} color={surfaceColor} />
+            <MaterialIcons name="inbox" size={48} color={textSecondary} />
             <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
               No categories yet
             </ThemedText>
-            <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.sm }}>
+            <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm }}>
               Add a category to get started
             </ThemedText>
           </View>
@@ -207,8 +212,8 @@ export default function TodosScreen() {
                   </View>
                 )}
                 {isExpanded && categoryTasks.length === 0 && (
-                  <View style={[styles.emptyCategory, { backgroundColor: colors.background }]}>
-                    <ThemedText type="default" style={{ color: surfaceColor }}>
+                  <View style={[styles.emptyCategory, { backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.divider }]}>
+                    <ThemedText type="default" style={{ color: textSecondary }}>
                       No tasks in this category
                     </ThemedText>
                   </View>
@@ -258,7 +263,7 @@ export default function TodosScreen() {
                   },
                 ]}
                 placeholder="Category name (e.g., AI/ML, Gym)"
-                placeholderTextColor={surfaceColor}
+                placeholderTextColor={textSecondary}
                 value={newCategoryTitle}
                 onChangeText={setNewCategoryTitle}
               />
@@ -317,7 +322,7 @@ export default function TodosScreen() {
                       },
                     ]}
                     placeholder="Task title"
-                    placeholderTextColor={surfaceColor}
+                    placeholderTextColor={textSecondary}
                     value={newTaskTitle}
                     onChangeText={setNewTaskTitle}
                   />
@@ -394,6 +399,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderLeftWidth: 4,
+    marginBottom: 1,
   },
   checkbox: {
     width: 24,

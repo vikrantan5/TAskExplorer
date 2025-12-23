@@ -6,32 +6,44 @@
 import { Platform } from "react-native";
 
 const tintColorLight = "#007AFF"; // Primary blue
-const tintColorDark = "#fff";
+const tintColorDark = "#0A84FF"; // Brighter blue for dark mode
 
 export const Colors = {
   light: {
     text: "#11181C",
-    background: "#fff",
+    textSecondary: "#687076",
+    background: "#FFFFFF",
+    backgroundSecondary: "#F8F9FA",
     tint: tintColorLight,
     icon: "#687076",
     tabIconDefault: "#687076",
     tabIconSelected: tintColorLight,
     success: "#34C759",
     warning: "#FF9500",
+    danger: "#FF3B30",
     surface: "#F2F2F7",
+    surfaceSecondary: "#E8E8ED",
     divider: "#E5E5EA",
+    card: "#FFFFFF",
+    cardBorder: "#E5E5EA",
   },
   dark: {
     text: "#ECEDEE",
-    background: "#151718",
+    textSecondary: "#9BA1A6",
+    background: "#000000",
+    backgroundSecondary: "#1C1C1E",
     tint: tintColorDark,
     icon: "#9BA1A6",
     tabIconDefault: "#9BA1A6",
     tabIconSelected: tintColorDark,
-    success: "#34C759",
-    warning: "#FF9500",
-    surface: "#2C2C2E",
-    divider: "#424245",
+    success: "#30D158",
+    warning: "#FF9F0A",
+    danger: "#FF453A",
+    surface: "#1C1C1E",
+    surfaceSecondary: "#2C2C2E",
+    divider: "#38383A",
+    card: "#1C1C1E",
+    cardBorder: "#38383A",
   },
 };
 

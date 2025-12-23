@@ -25,7 +25,8 @@ export default function AnalyticsScreen() {
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
-  const surfaceColor = useThemeColor({}, "icon");
+  const textSecondary = Colors[colorScheme ?? "light"].textSecondary;
+  const dangerColor = Colors[colorScheme ?? "light"].danger;
   const colors = Colors[colorScheme ?? "light"];
 
   // Load analytics history
@@ -137,7 +138,7 @@ export default function AnalyticsScreen() {
         <defs>
           <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor={accentColor} />
-            <stop offset="100%" stopColor="#5856D6" />
+            <stop offset="100%" stopColor={colorScheme === "dark" ? "#0A84FF" : "#005FCC"} />
           </linearGradient>
         </defs>
       </Svg>
@@ -177,7 +178,7 @@ export default function AnalyticsScreen() {
                   x={x}
                   y={chartHeight - 5}
                   fontSize="10"
-                  fill={surfaceColor}
+                  fill={textSecondary}
                   textAnchor="middle"
                 >
                   {new Date(day.date).toLocaleDateString("en-US", { weekday: "short" }).substring(0, 1)}
@@ -226,7 +227,7 @@ export default function AnalyticsScreen() {
           <ThemedText type="default" style={{ fontSize: 15 }}>
             {title}
           </ThemedText>
-          <ThemedText type="default" style={{ color: surfaceColor, fontSize: 13 }}>
+          <ThemedText type="default" style={{ color: textSecondary, fontSize: 13 }}>
             {completed}/{total}
           </ThemedText>
         </View>
@@ -245,7 +246,7 @@ export default function AnalyticsScreen() {
             />
           </Animated.View>
         </View>
-        <ThemedText type="default" style={{ color: surfaceColor, fontSize: 12, marginTop: 4 }}>
+        <ThemedText type="default" style={{ color: textSecondary, fontSize: 12, marginTop: 4 }}>
           {percentage}% complete
         </ThemedText>
       </Animated.View>
@@ -294,7 +295,7 @@ export default function AnalyticsScreen() {
               <ThemedText type="title" style={{ fontSize: 48, fontWeight: "bold" }}>
                 {dailyStats.percentage}%
               </ThemedText>
-              <ThemedText type="default" style={{ color: surfaceColor, fontSize: 16 }}>
+              <ThemedText type="default" style={{ color: textSecondary, fontSize: 16 }}>
                 Complete
               </ThemedText>
             </View>
@@ -396,11 +397,11 @@ export default function AnalyticsScreen() {
         {/* Empty State */}
         {tasks.length === 0 && (
           <View style={styles.emptyState}>
-            <MaterialIcons name="assessment" size={64} color={surfaceColor} />
+            <MaterialIcons name="assessment" size={64} color={textSecondary} />
             <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
               No tasks yet
             </ThemedText>
-            <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.sm, textAlign: "center" }}>
+            <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
               Create tasks to see your analytics and track your progress
             </ThemedText>
           </View>

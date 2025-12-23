@@ -37,7 +37,8 @@ export default function ProfileScreen() {
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
-  const surfaceColor = useThemeColor({}, "icon");
+  const textSecondary = Colors[colorScheme ?? "light"].textSecondary;
+  const dangerColor = Colors[colorScheme ?? "light"].danger;
   const colors = Colors[colorScheme ?? "light"];
 
   // Calculate user stats
@@ -172,7 +173,7 @@ export default function ProfileScreen() {
             <ThemedText type="title" style={{ fontSize: 32, marginTop: Spacing.xl, textAlign: "center" }}>
               Task Master
             </ThemedText>
-            <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.sm, textAlign: "center" }}>
+            <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm, textAlign: "center" }}>
               Your personal productivity companion
             </ThemedText>
           </View>
@@ -191,7 +192,7 @@ export default function ProfileScreen() {
                     },
                   ]}
                   placeholder="Your name"
-                  placeholderTextColor={surfaceColor}
+                  placeholderTextColor={textSecondary}
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -211,7 +212,7 @@ export default function ProfileScreen() {
                   },
                 ]}
                 placeholder="your@email.com"
-                placeholderTextColor={surfaceColor}
+                placeholderTextColor={textSecondary}
                 value={email}
                 onChangeText={setEmail}
                 autoCapitalize="none"
@@ -231,7 +232,7 @@ export default function ProfileScreen() {
                   },
                 ]}
                 placeholder="••••••••"
-                placeholderTextColor={surfaceColor}
+                placeholderTextColor={textSecondary}
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -262,7 +263,7 @@ export default function ProfileScreen() {
               onPress={() => setIsSignUp(!isSignUp)}
               style={styles.switchAuthButton}
             >
-              <ThemedText type="default" style={{ color: surfaceColor, textAlign: "center" }}>
+              <ThemedText type="default" style={{ color: textSecondary, textAlign: "center" }}>
                 {isSignUp ? "Already have an account? " : "Don't have an account? "}
                 <ThemedText type="defaultSemiBold" style={{ color: accentColor }}>
                   {isSignUp ? "Log In" : "Sign Up"}
@@ -290,7 +291,7 @@ export default function ProfileScreen() {
         {/* Profile Header */}
         <View style={[styles.profileHeader, { paddingHorizontal: Spacing.lg }]}>
           <LinearGradient
-            colors={[accentColor, "#5856D6"]}
+            colors={colorScheme === "dark" ? ["#0A84FF", "#0066CC"] : [accentColor, "#005FCC"]}
             style={styles.avatar}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
@@ -302,7 +303,7 @@ export default function ProfileScreen() {
             <ThemedText type="title" style={{ fontSize: 24 }}>
               {user?.name || user?.email || "User"}
             </ThemedText>
-            <ThemedText type="default" style={{ color: surfaceColor, marginTop: Spacing.xs }}>
+            <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.xs }}>
               {user?.email}
             </ThemedText>
           </View>
@@ -383,7 +384,7 @@ export default function ProfileScreen() {
               Task Master is your personal productivity companion. Build discipline and consistency by tracking
               daily tasks, organizing by skills, and monitoring your progress.
             </ThemedText>
-            <ThemedText type="default" style={{ marginTop: Spacing.lg, fontSize: 12, color: surfaceColor }}>
+            <ThemedText type="default" style={{ marginTop: Spacing.lg, fontSize: 12, color: textSecondary }}>
               Version 1.0.0 • Powered by Supabase
             </ThemedText>
           </View>
@@ -396,14 +397,14 @@ export default function ProfileScreen() {
             styles.logoutButton,
             {
               backgroundColor: colors.surface,
-              borderColor: colors.warning || "#FF9500",
+              borderColor: dangerColor,
             },
           ]}
         >
-          <MaterialIcons name="logout" size={20} color={colors.warning || "#FF9500"} />
+          <MaterialIcons name="logout" size={20} color={dangerColor} />
           <ThemedText
             type="defaultSemiBold"
-            style={{ color: colors.warning || "#FF9500", marginLeft: Spacing.md }}
+            style={{ color: dangerColor, marginLeft: Spacing.md }}
           >
             Logout
           </ThemedText>
