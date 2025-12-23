@@ -400,6 +400,7 @@ export default function ProfileScreen() {
               borderColor: dangerColor,
             },
           ]}
+          data-testid="logout-button"
         >
           <MaterialIcons name="logout" size={20} color={dangerColor} />
           <ThemedText

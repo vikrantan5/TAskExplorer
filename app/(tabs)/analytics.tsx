@@ -215,7 +215,7 @@ export default function AnalyticsScreen() {
       width: `${animatedWidth.value}%`,
     }));
 
-    const getGradientColors = (percentage: number) => {
+    const getGradientColors = (percentage: number): [string, string] => {
       if (percentage >= 80) return ["#11998e", "#38ef7d"];
       if (percentage >= 50) return ["#667eea", "#764ba2"];
       return ["#f093fb", "#f5576c"];
@@ -279,7 +279,7 @@ export default function AnalyticsScreen() {
       ]}
     >
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <ThemedText type="title" style={{ fontSize: 32, paddingHorizontal: Spacing.lg, fontWeight: "bold" }}>
+        <ThemedText type="title" style={{ fontSize: 32, paddingHorizontal: Spacing.lg, fontWeight: "bold" }} data-testid="analytics-title">
           Analytics
         </ThemedText>
 
@@ -289,10 +289,10 @@ export default function AnalyticsScreen() {
             Today's Progress
           </ThemedText>
 
-          <View style={styles.progressRingContainer}>
+          <View style={styles.progressRingContainer} data-testid="progress-ring-container">
             <ProgressRing progress={dailyStats.percentage} />
             <View style={styles.progressRingText}>
-              <ThemedText type="title" style={{ fontSize: 48, fontWeight: "bold" }}>
+              <ThemedText type="title" style={{ fontSize: 48, fontWeight: "bold" }} data-testid="progress-percentage">
                 {dailyStats.percentage}%
               </ThemedText>
               <ThemedText type="default" style={{ color: textSecondary, fontSize: 16 }}>
@@ -305,6 +305,7 @@ export default function AnalyticsScreen() {
             <Animated.View
               style={[styles.statCard]}
               entering={FadeIn.delay(100)}
+              data-testid="stat-completed"
             >
               <LinearGradient
                 colors={["#11998e", "#38ef7d"]}
@@ -325,6 +326,7 @@ export default function AnalyticsScreen() {
             <Animated.View
               style={[styles.statCard]}
               entering={FadeIn.delay(200)}
+              data-testid="stat-remaining"
             >
               <LinearGradient
                 colors={["#f093fb", "#f5576c"]}

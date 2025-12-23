@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   StyleSheet,
@@ -7,9 +7,13 @@ import {
   TextInput,
   Modal,
   ScrollView,
+  RefreshControl,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import { Swipeable } from "react-native-gesture-handler";
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -21,10 +25,12 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 export default function NotesScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { notes, addNote, deleteNote, updateNote } = useNoteContext();
+  const { notes, addNote, deleteNote, updateNote, loadNotes } = useNoteContext();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
@@ -32,8 +38,20 @@ export default function NotesScreen() {
   const dangerColor = Colors[colorScheme ?? "light"].danger;
   const colors = Colors[colorScheme ?? "light"];
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await loadNotes();
+    setRefreshing(false);
+  }, [loadNotes]);
+
+  const filteredNotes = notes.filter((note) =>
+    note.content.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   const handleAddNote = async () => {
     if (newNoteContent.trim()) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       if (editingNoteId) {
         await updateNote(editingNoteId, newNoteContent);
         setEditingNoteId(null);
@@ -46,9 +64,29 @@ export default function NotesScreen() {
   };
 
   const handleEditNote = (noteId: string, content: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setEditingNoteId(noteId);
     setNewNoteContent(content);
     setShowAddModal(true);
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      "Delete Note",
+      "Are you sure you want to delete this note?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            await deleteNote(noteId);
+          },
+        },
+      ]
+    );
   };
 
   const formatDate = (date: Date) => {
@@ -60,41 +98,63 @@ export default function NotesScreen() {
     });
   };
 
+  const renderRightActions = (noteId: string) => {
+    return (
+      <Pressable
+        style={[styles.deleteSwipeAction, { backgroundColor: dangerColor }]}
+        onPress={() => handleDeleteNote(noteId)}
+        data-testid={`note-swipe-delete-${noteId}`}
+      >
+        <MaterialIcons name="delete" size={24} color="#fff" />
+        <ThemedText type="defaultSemiBold" style={{ color: "#fff", marginTop: 4 }}>
+          Delete
+        </ThemedText>
+      </Pressable>
+    );
+  };
+
   const renderNoteItem = ({ item: note }: { item: any }) => {
     const preview = note.content.split("\n")[0].substring(0, 100);
 
     return (
-      <Animated.View entering={FadeIn} exiting={FadeOut}>
-        <Pressable
-          style={[
-            styles.noteCard,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.divider,
-            },
-          ]}
-          onPress={() => handleEditNote(note.id, note.content)}
-        >
-          <View style={styles.noteContent}>
-            <ThemedText type="defaultSemiBold" numberOfLines={2}>
-              {preview}
-            </ThemedText>
-            <ThemedText
-              type="default"
-              style={{ color: textSecondary, marginTop: Spacing.sm, fontSize: 12 }}
-            >
-              {formatDate(note.createdAt)}
-            </ThemedText>
-          </View>
-
+      <Swipeable
+        renderRightActions={() => renderRightActions(note.id)}
+        overshootRight={false}
+      >
+        <Animated.View entering={FadeIn} exiting={FadeOut}>
           <Pressable
-            onPress={() => deleteNote(note.id)}
-            style={styles.deleteButton}
+            style={[
+              styles.noteCard,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.divider,
+              },
+            ]}
+            onPress={() => handleEditNote(note.id, note.content)}
+            data-testid={`note-item-${note.id}`}
           >
-            <MaterialIcons name="close" size={20} color={dangerColor} />
+            <View style={styles.noteContent}>
+              <ThemedText type="defaultSemiBold" numberOfLines={2}>
+                {preview}
+              </ThemedText>
+              <ThemedText
+                type="default"
+                style={{ color: textSecondary, marginTop: Spacing.sm, fontSize: 12 }}
+              >
+                {formatDate(note.createdAt)}
+              </ThemedText>
+            </View>
+
+            <Pressable
+              onPress={() => handleDeleteNote(note.id)}
+              style={styles.deleteButton}
+              data-testid={`note-delete-${note.id}`}
+            >
+              <MaterialIcons name="close" size={20} color={dangerColor} />
+            </Pressable>
           </Pressable>
-        </Pressable>
-      </Animated.View>
+        </Animated.View>
+      </Swipeable>
     );
   };
 
@@ -114,17 +174,60 @@ export default function NotesScreen() {
         </ThemedText>
         <Pressable
           onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             setEditingNoteId(null);
             setNewNoteContent("");
             setShowAddModal(true);
           }}
           style={[styles.addButton, { backgroundColor: accentColor }]}
+          data-testid="add-note-button"
         >
           <MaterialIcons name="add" size={24} color="#fff" />
         </Pressable>
       </View>
 
-      {notes.length === 0 ? (
+      {/* Search Bar */}
+      {notes.length > 0 && (
+        <View style={[styles.searchContainer, { paddingHorizontal: Spacing.lg }]}>
+          <View
+            style={[
+              styles.searchBar,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.divider,
+              },
+            ]}
+          >
+            <MaterialIcons name="search" size={20} color={textSecondary} />
+            <TextInput
+              style={[
+                styles.searchInput,
+                {
+                  color: textColor,
+                },
+              ]}
+              placeholder="Search notes..."
+              placeholderTextColor={textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              data-testid="notes-search-input"
+            />
+            {searchQuery.length > 0 && (
+              <Pressable
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSearchQuery("");
+                }}
+                data-testid="notes-search-clear"
+              >
+                <MaterialIcons name="close" size={20} color={textSecondary} />
+              </Pressable>
+            )}
+          </View>
+        </View>
+      )}
+
+      {filteredNotes.length === 0 && searchQuery.length === 0 ? (
         <View style={styles.emptyState}>
           <MaterialIcons name="note" size={48} color={textSecondary} />
           <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
@@ -134,13 +237,30 @@ export default function NotesScreen() {
             Create a note to get started
           </ThemedText>
         </View>
+      ) : filteredNotes.length === 0 && searchQuery.length > 0 ? (
+        <View style={styles.emptyState}>
+          <MaterialIcons name="search-off" size={48} color={textSecondary} />
+          <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
+            No results found
+          </ThemedText>
+          <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm }}>
+            Try a different search term
+          </ThemedText>
+        </View>
       ) : (
         <FlatList
-          data={notes}
+          data={filteredNotes}
           renderItem={renderNoteItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.notesList}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={accentColor}
+            />
+          }
         />
       )}
 
@@ -197,6 +317,7 @@ export default function NotesScreen() {
                   opacity: !newNoteContent.trim() ? 0.5 : 1,
                 },
               ]}
+              data-testid="save-note-button"
             >
               <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
                 {editingNoteId ? "Update Note" : "Save Note"}
@@ -218,7 +339,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  searchContainer: {
     marginBottom: Spacing.lg,
+  },
+  searchBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: BorderRadius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    paddingVertical: Spacing.xs,
   },
   addButton: {
     width: 48,
@@ -255,6 +393,14 @@ const styles = StyleSheet.create({
   deleteButton: {
     padding: Spacing.sm,
     marginLeft: Spacing.md,
+  },
+  deleteSwipeAction: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    marginBottom: Spacing.md,
+    borderRadius: BorderRadius.lg,
+    marginLeft: Spacing.sm,
   },
   modalContainer: {
     flex: 1,

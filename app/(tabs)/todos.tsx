@@ -8,9 +8,11 @@ import {
   Modal,
   Switch,
   ScrollView,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
@@ -22,13 +24,14 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 export default function TodosScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { categories, tasks, addCategory, addTask, toggleTask, deleteTask } = useTaskContext();
+  const { categories, tasks, addCategory, addTask, toggleTask, deleteTask, syncData, loading } = useTaskContext();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [refreshing, setRefreshing] = useState(false);
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
@@ -37,7 +40,15 @@ export default function TodosScreen() {
   const dangerColor = Colors[colorScheme ?? "light"].danger;
   const colors = Colors[colorScheme ?? "light"];
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    await syncData();
+    setRefreshing(false);
+  }, [syncData]);
+
   const toggleCategoryExpanded = useCallback((categoryId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setExpandedCategories((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(categoryId)) {
@@ -51,6 +62,7 @@ export default function TodosScreen() {
 
   const handleAddCategory = async () => {
     if (newCategoryTitle.trim()) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await addCategory(newCategoryTitle);
       setNewCategoryTitle("");
     }
@@ -58,6 +70,7 @@ export default function TodosScreen() {
 
   const handleAddTask = async () => {
     if (newTaskTitle.trim() && selectedCategory) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       await addTask(selectedCategory, newTaskTitle, isDaily);
       setNewTaskTitle("");
       setSelectedCategory(null);
@@ -118,7 +131,11 @@ export default function TodosScreen() {
               borderLeftWidth: 4,
             },
           ]}
-          onPress={() => toggleTask(task.id)}
+          onPress={async () => {
+            await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            await toggleTask(task.id);
+          }}
+          data-testid={`task-item-${task.id}`}
         >
           <Pressable
             style={[
@@ -128,7 +145,11 @@ export default function TodosScreen() {
                 backgroundColor: task.isCompleted ? colors.success || "#34C759" : "transparent",
               },
             ]}
-            onPress={() => toggleTask(task.id)}
+            onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              await toggleTask(task.id);
+            }}
+            data-testid={`task-checkbox-${task.id}`}
           >
             {task.isCompleted && (
               <MaterialIcons name="check" size={16} color="#fff" />
@@ -155,8 +176,12 @@ export default function TodosScreen() {
           </View>
 
           <Pressable
-            onPress={() => deleteTask(task.id)}
+            onPress={async () => {
+              await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+              await deleteTask(task.id);
+            }}
             style={styles.deleteButton}
+            data-testid={`task-delete-${task.id}`}
           >
             <MaterialIcons name="close" size={20} color={dangerColor} />
           </Pressable>
@@ -187,7 +212,17 @@ export default function TodosScreen() {
         </Pressable>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={accentColor}
+          />
+        }
+      >
         {categories.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialIcons name="inbox" size={48} color={textSecondary} />
