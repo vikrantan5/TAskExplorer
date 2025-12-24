@@ -357,10 +357,6 @@ export default function TodosScreen() {
             onDragEnd={({ data }) => handleDragEndCategories(data)}
             keyExtractor={(item) => item.id}
             onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
-            scrollEnabled={true}
-            style={{ flex: 1 }}
-            contentContainerStyle={{ flexGrow: 1 }}
-            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -742,5 +738,3 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
 });
-
-
