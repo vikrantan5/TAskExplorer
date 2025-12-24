@@ -19,6 +19,7 @@ import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/manus-runtime";
 import { TaskProvider } from "@/context/TaskContext";
 import { NoteProvider } from "@/context/NoteContext";
+import { ChatProvider } from "@/context/ChatContext";
 import { Colors } from "@/constants/theme";
 
 const DEFAULT_WEB_INSETS: EdgeInsets = { top: 0, right: 0, bottom: 0, left: 0 };
@@ -107,14 +108,16 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <TaskProvider>
             <NoteProvider>
-              <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-                <Stack>
-                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                  <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
-                  <Stack.Screen name="oauth/callback" options={{ headerShown: false }} />
-                </Stack>
-                <StatusBar style="auto" />
-              </ThemeProvider>
+              <ChatProvider>
+                <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+                  <Stack>
+                    <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                    <Stack.Screen name="modal" options={{ presentation: "modal", title: "Modal" }} />
+                    <Stack.Screen name="oauth/callback" options={{ headerShown: false }} />
+                  </Stack>
+                  <StatusBar style="auto" />
+                </ThemeProvider>
+              </ChatProvider>
             </NoteProvider>
           </TaskProvider>
         </QueryClientProvider>

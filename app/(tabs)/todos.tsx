@@ -357,6 +357,8 @@ export default function TodosScreen() {
             onDragEnd={({ data }) => handleDragEndCategories(data)}
             keyExtractor={(item) => item.id}
             onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={true}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -373,7 +375,7 @@ export default function TodosScreen() {
                   <View key={category.id}>
                     {renderCategoryHeader(category, isDraggingCategories ? drag : undefined, isActive)}
                     {isExpanded && categoryTasks.length > 0 && (
-                      <View style={{ backgroundColor: colors.background }}>
+                      <View style={{ backgroundColor: colors.background, maxHeight: 400 }}>
                         <DraggableFlatList
                           data={categoryTasks}
                           onDragEnd={({ data }) => handleDragEndTasks(category.id, data)}
@@ -381,6 +383,7 @@ export default function TodosScreen() {
                           onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
                           nestedScrollEnabled={true}
                           scrollEnabled={true}
+                          showsVerticalScrollIndicator={true}
                           renderItem={({ item: task, drag: dragTask, isActive: isTaskActive }: RenderItemParams<Task>) => (
                             <ScaleDecorator>
                               {renderTaskItem(task, dragTask, isTaskActive)}

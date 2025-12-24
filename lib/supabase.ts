@@ -62,3 +62,25 @@ export interface AnalyticsHistory {
   category_stats: any;
   created_at: string;
 }
+
+export interface Message {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string | null;
+  content: string;
+  message_type: 'text' | 'image' | 'file';
+  file_url: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  created_at: string;
+  deleted_at: string | null;
+  is_deleted_for_everyone: boolean;
+}
+
+export interface MessageDeletion {
+  id: string;
+  message_id: string;
+  user_id: string;
+  created_at: string;
+}
