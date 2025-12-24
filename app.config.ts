@@ -2,39 +2,42 @@
 import "./scripts/load-env.js";
 import type { ExpoConfig } from "expo/config";
 
-// Bundle ID format: space.manus.<project_name_dots>.<timestamp>
-// e.g., "my-app" created at 2024-01-15 10:30:45 -> "space.manus.my.app.t20240115103045"
+// Bundle ID format
 const bundleId = "space.manus.task.master.t20251223091111";
-// Extract timestamp from bundle ID and prefix with "manus" for deep link scheme
-// e.g., "space.manus.my.app.t20240115103045" -> "manus20240115103045"
+
+// Extract timestamp for deep link scheme
 const timestamp = bundleId.split(".").pop()?.replace(/^t/, "") ?? "";
 const schemeFromBundleId = `manus${timestamp}`;
 
 const env = {
-  // App branding - update these values directly (do not use env vars)
-  appName: 'Task Master',
-  appSlug: 'task-master',
-  // S3 URL of the app logo - set this to the URL returned by generate_image when creating custom logo
-  // Leave empty to use the default icon from assets/images/icon.png
-  logoUrl: 'https://files.manuscdn.com/user_upload_by_module/session_file/310519663261016857/oCWpkKimHtivrujH.png',
+  appName: "Task Master",
+  appSlug: "task-master",
+  logoUrl:
+    "https://files.manuscdn.com/user_upload_by_module/session_file/310519663261016857/oCWpkKimHtivrujH.png",
   scheme: schemeFromBundleId,
   iosBundleId: bundleId,
   androidPackage: bundleId,
 };
 
 const config: ExpoConfig = {
-  name: 'Task Master',
-  slug: 'task-master',
+  name: env.appName,
+  slug: env.appSlug,
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
+
+  /** 🔥 THIS IS THE IMPORTANT FIX */
   extra: {
+    eas: {
+      projectId: "a5d12b84-d53a-42d5-88c8-817ed17452aa",
+    },
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
   },
+
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
@@ -42,17 +45,16 @@ const config: ExpoConfig = {
       UIBackgroundModes: ["audio"],
     },
   },
+
   android: {
+    package: env.androidPackage,
+    permissions: ["POST_NOTIFICATIONS"],
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    edgeToEdgeEnabled: true,
-    predictiveBackGestureEnabled: false,
-    package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
     intentFilters: [
       {
         action: "VIEW",
@@ -67,10 +69,12 @@ const config: ExpoConfig = {
       },
     ],
   },
+
   web: {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
+
   plugins: [
     "expo-router",
     [
@@ -86,6 +90,7 @@ const config: ExpoConfig = {
       },
     ],
   ],
+
   experiments: {
     typedRoutes: true,
     reactCompiler: true,

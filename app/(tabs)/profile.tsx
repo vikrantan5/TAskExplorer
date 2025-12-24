@@ -383,6 +383,7 @@ export default function ProfileScreen() {
             <ThemedText type="default" style={{ lineHeight: 22 }}>
               Task Master is your personal productivity companion. Build discipline and consistency by tracking
               daily tasks, organizing by skills, and monitoring your progress.
+              Made by Vikrant👌
             </ThemedText>
             <ThemedText type="default" style={{ marginTop: Spacing.lg, fontSize: 12, color: textSecondary }}>
               Version 1.0.0 • Powered by Supabase

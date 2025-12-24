@@ -1,7 +1,7 @@
 import React, { useMemo, useEffect, useState } from "react";
-import { View, StyleSheet, ScrollView, Dimensions } from "react-native";
+import { View, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Line, Text as SvgText, Defs, LinearGradient as SvgLinearGradient, Stop } from "react-native-svg";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, FadeIn } from "react-native-reanimated";
 import { LinearGradient } from "expo-linear-gradient";
 import { ThemedText } from "@/components/themed-text";
@@ -22,6 +22,7 @@ export default function AnalyticsScreen() {
   const { categories, tasks } = useTaskContext();
   const [analyticsHistory, setAnalyticsHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
@@ -36,8 +37,12 @@ export default function AnalyticsScreen() {
 
   const loadAnalyticsHistory = async () => {
     try {
+      setError(null);
       const user = await authService.getCurrentUser();
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from("analytics_history")
@@ -46,10 +51,15 @@ export default function AnalyticsScreen() {
         .order("date", { ascending: false })
         .limit(7);
 
-      if (error) throw error;
-      setAnalyticsHistory(data || []);
+      if (error) {
+        console.error("Error loading analytics history:", error);
+        setError("Failed to load analytics history");
+      } else {
+        setAnalyticsHistory(data || []);
+      }
     } catch (error) {
       console.error("Error loading analytics history:", error);
+      setError("An error occurred while loading analytics");
     } finally {
       setLoading(false);
     }
@@ -108,9 +118,16 @@ export default function AnalyticsScreen() {
     const radius = (size - strokeWidth) / 2;
     const circumference = radius * 2 * Math.PI;
     const strokeDashoffset = circumference - (progress / 100) * circumference;
+    const gradientEndColor = colorScheme === "dark" ? "#0A84FF" : "#005FCC";
 
     return (
       <Svg width={size} height={size} style={styles.progressRing}>
+        <Defs>
+          <SvgLinearGradient id="progressGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <Stop offset="0%" stopColor={accentColor} stopOpacity="1" />
+            <Stop offset="100%" stopColor={gradientEndColor} stopOpacity="1" />
+          </SvgLinearGradient>
+        </Defs>
         {/* Background circle */}
         <Circle
           stroke={colors.divider}
@@ -123,7 +140,7 @@ export default function AnalyticsScreen() {
         />
         {/* Progress circle */}
         <Circle
-          stroke="url(#gradient)"
+          stroke="url(#progressGradient)"
           fill="none"
           cx={size / 2}
           cy={size / 2}
@@ -135,12 +152,6 @@ export default function AnalyticsScreen() {
           rotation="-90"
           origin={`${size / 2}, ${size / 2}`}
         />
-        <defs>
-          <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={accentColor} />
-            <stop offset="100%" stopColor={colorScheme === "dark" ? "#0A84FF" : "#005FCC"} />
-          </linearGradient>
-        </defs>
       </Svg>
     );
   };
@@ -151,15 +162,33 @@ export default function AnalyticsScreen() {
     const barWidth = (chartWidth - 60) / 7;
     const maxHeight = chartHeight - 40;
 
+    // Get last 7 days of data, reverse for chronological order
     const weekData = analyticsHistory.slice(0, 7).reverse();
+
+    // If no data, show placeholder
+    if (weekData.length === 0) {
+      return (
+        <View style={[styles.chartContainer, { height: chartHeight, justifyContent: "center", alignItems: "center" }]}>
+          <MaterialIcons name="show-chart" size={48} color={textSecondary} />
+          <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.md }}>
+            No weekly data available yet
+          </ThemedText>
+          <ThemedText type="default" style={{ color: textSecondary, fontSize: 12, marginTop: Spacing.xs }}>
+            Complete tasks to see your weekly progress
+          </ThemedText>
+        </View>
+      );
+    }
 
     return (
       <View style={styles.chartContainer}>
         <Svg width={chartWidth} height={chartHeight}>
           {weekData.map((day, index) => {
-            const barHeight = (day.completion_percentage / 100) * maxHeight;
+            const percentage = day.completion_percentage || 0;
+            const barHeight = Math.max((percentage / 100) * maxHeight, 4); // Minimum height of 4
             const x = 30 + index * barWidth + barWidth / 4;
             const y = chartHeight - 20 - barHeight;
+            const barColor = percentage >= 80 ? "#34C759" : percentage >= 50 ? accentColor : "#FF9500";
 
             return (
               <React.Fragment key={index}>
@@ -169,7 +198,7 @@ export default function AnalyticsScreen() {
                   y1={chartHeight - 20}
                   x2={x}
                   y2={y}
-                  stroke={day.completion_percentage >= 80 ? "#34C759" : accentColor}
+                  stroke={barColor}
                   strokeWidth={barWidth / 2}
                   strokeLinecap="round"
                 />
@@ -184,16 +213,18 @@ export default function AnalyticsScreen() {
                   {new Date(day.date).toLocaleDateString("en-US", { weekday: "short" }).substring(0, 1)}
                 </SvgText>
                 {/* Percentage label */}
-                <SvgText
-                  x={x}
-                  y={y - 5}
-                  fontSize="10"
-                  fill={textColor}
-                  textAnchor="middle"
-                  fontWeight="bold"
-                >
-                  {day.completion_percentage}%
-                </SvgText>
+                {percentage > 0 && (
+                  <SvgText
+                    x={x}
+                    y={y - 5}
+                    fontSize="10"
+                    fill={textColor}
+                    textAnchor="middle"
+                    fontWeight="bold"
+                  >
+                    {percentage}%
+                  </SvgText>
+                )}
               </React.Fragment>
             );
           })}
@@ -283,6 +314,18 @@ export default function AnalyticsScreen() {
           Analytics
         </ThemedText>
 
+        {/* Error State */}
+        {error && (
+          <View style={[styles.errorContainer, { paddingHorizontal: Spacing.lg, marginTop: Spacing.lg }]}>
+            <View style={[styles.errorCard, { backgroundColor: colors.surface, borderColor: dangerColor }]}>
+              <MaterialIcons name="error-outline" size={32} color={dangerColor} />
+              <ThemedText type="default" style={{ color: dangerColor, marginTop: Spacing.md, textAlign: "center" }}>
+                {error}
+              </ThemedText>
+            </View>
+          </View>
+        )}
+
         {/* Today's Summary */}
         <View style={[styles.section, { paddingHorizontal: Spacing.lg }]}>
           <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg, fontSize: 20 }}>
@@ -358,24 +401,31 @@ export default function AnalyticsScreen() {
         </View>
 
         {/* Weekly Progress */}
-        {analyticsHistory.length > 0 && (
-          <View style={[styles.section, { paddingHorizontal: Spacing.lg }]}>
-            <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg, fontSize: 20 }}>
-              Weekly Progress
-            </ThemedText>
-            <View
-              style={[
-                styles.chartWrapper,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.divider,
-                },
-              ]}
-            >
+        <View style={[styles.section, { paddingHorizontal: Spacing.lg }]}>
+          <ThemedText type="subtitle" style={{ marginBottom: Spacing.lg, fontSize: 20 }}>
+            Weekly Progress
+          </ThemedText>
+          <View
+            style={[
+              styles.chartWrapper,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.divider,
+              },
+            ]}
+          >
+            {loading ? (
+              <View style={{ height: 180, justifyContent: "center", alignItems: "center" }}>
+                <ActivityIndicator size="large" color={accentColor} />
+                <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.md }}>
+                  Loading analytics...
+                </ThemedText>
+              </View>
+            ) : (
               <WeeklyChart />
-            </View>
+            )}
           </View>
-        )}
+        </View>
 
         {/* Category Breakdown */}
         {categoryStats.length > 0 && (
@@ -423,6 +473,16 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: Spacing.xl,
     marginTop: Spacing.xl,
+  },
+  errorContainer: {
+    marginBottom: Spacing.lg,
+  },
+  errorCard: {
+    borderRadius: BorderRadius.lg,
+    borderWidth: 2,
+    padding: Spacing.lg,
+    alignItems: "center",
+    justifyContent: "center",
   },
   progressRingContainer: {
     alignItems: "center",

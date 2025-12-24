@@ -12,11 +12,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from "react-native-draggable-flatlist";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import * as Haptics from "expo-haptics";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { useThemeColor } from "@/hooks/use-theme-color";
-import { useTaskContext } from "@/context/TaskContext";
+import { useTaskContext, Task, Category } from "@/context/TaskContext";
 import { Colors, Spacing, BorderRadius } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
@@ -24,7 +26,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 export default function TodosScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { categories, tasks, addCategory, addTask, toggleTask, deleteTask, syncData, loading } = useTaskContext();
+  const { categories, tasks, addCategory, addTask, toggleTask, deleteTask, syncData, reorderTasks, reorderCategories, loading } = useTaskContext();
   const [showAddModal, setShowAddModal] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
@@ -32,6 +34,7 @@ export default function TodosScreen() {
   const [isDaily, setIsDaily] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [refreshing, setRefreshing] = useState(false);
+  const [isDraggingCategories, setIsDraggingCategories] = useState(false);
 
   const accentColor = useThemeColor({}, "tint");
   const textColor = useThemeColor({}, "text");
@@ -83,7 +86,18 @@ export default function TodosScreen() {
     return tasks.filter((task) => task.categoryId === categoryId);
   };
 
-  const renderCategoryHeader = (category: any) => {
+  const handleDragEndCategories = useCallback(async (data: Category[]) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await reorderCategories(data);
+    setIsDraggingCategories(false);
+  }, [reorderCategories]);
+
+  const handleDragEndTasks = useCallback(async (categoryId: string, data: Task[]) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await reorderTasks(categoryId, data);
+  }, [reorderTasks]);
+
+  const renderCategoryHeader = (category: Category, drag?: () => void, isActive?: boolean) => {
     const categoryTasks = getCategoryTasks(category.id);
     const completedCount = categoryTasks.filter((t) => t.isCompleted).length;
     const isExpanded = expandedCategories.has(category.id);
@@ -92,14 +106,23 @@ export default function TodosScreen() {
       <Pressable
         key={category.id}
         onPress={() => toggleCategoryExpanded(category.id)}
+        onLongPress={drag}
+        disabled={isActive}
         style={[
           styles.categoryHeader,
           {
-            backgroundColor: colors.surface,
+            backgroundColor: isActive ? colors.card : colors.surface,
             borderBottomColor: colors.divider,
+            opacity: isActive ? 0.8 : 1,
           },
         ]}
       >
+        <MaterialIcons 
+          name="drag-indicator" 
+          size={24} 
+          color={textSecondary} 
+          style={{ marginRight: Spacing.sm }}
+        />
         <View style={styles.categoryInfo}>
           <ThemedText type="subtitle" style={{ fontSize: 18 }}>
             {category.title}
@@ -117,7 +140,7 @@ export default function TodosScreen() {
     );
   };
 
-  const renderTaskItem = (task: any) => {
+  const renderTaskItem = (task: Task, drag?: () => void, isActive?: boolean) => {
     return (
       <Animated.View key={task.id} entering={FadeIn} exiting={FadeOut}>
         <Pressable
@@ -129,14 +152,24 @@ export default function TodosScreen() {
               borderColor: colors.cardBorder,
               borderWidth: 1,
               borderLeftWidth: 4,
+              opacity: isActive ? 0.8 : 1,
             },
           ]}
           onPress={async () => {
             await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             await toggleTask(task.id);
           }}
+          onLongPress={drag}
+          disabled={isActive}
           data-testid={`task-item-${task.id}`}
         >
+          <MaterialIcons 
+            name="drag-indicator" 
+            size={20} 
+            color={textSecondary} 
+            style={{ marginRight: Spacing.sm }}
+          />
+          
           <Pressable
             style={[
               styles.checkbox,
@@ -191,80 +224,125 @@ export default function TodosScreen() {
   };
 
   return (
-    <ThemedView
-      style={[
-        styles.container,
-        {
-          paddingTop: Math.max(insets.top, Spacing.lg),
-          paddingBottom: Math.max(insets.bottom, Spacing.lg),
-        },
-      ]}
-    >
-      <View style={styles.header}>
-        <ThemedText type="title" style={{ fontSize: 28 }}>
-          Tasks
-        </ThemedText>
-        <Pressable
-          onPress={() => setShowAddModal(true)}
-          style={[styles.addButton, { backgroundColor: accentColor }]}
-        >
-          <MaterialIcons name="add" size={24} color="#fff" />
-        </Pressable>
-      </View>
-
-      <ScrollView 
-        style={styles.content} 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={accentColor}
-          />
-        }
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemedView
+        style={[
+          styles.container,
+          {
+            paddingTop: Math.max(insets.top, Spacing.lg),
+            paddingBottom: Math.max(insets.bottom, Spacing.lg),
+          },
+        ]}
       >
-        {categories.length === 0 ? (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="inbox" size={48} color={textSecondary} />
-            <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
-              No categories yet
-            </ThemedText>
-            <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm }}>
-              Add a category to get started
-            </ThemedText>
+        <View style={styles.header}>
+          <ThemedText type="title" style={{ fontSize: 28 }}>
+            Tasks
+          </ThemedText>
+          <View style={{ flexDirection: "row", gap: Spacing.sm }}>
+            <Pressable
+              onPress={() => setIsDraggingCategories(!isDraggingCategories)}
+              style={[
+                styles.reorderButton,
+                { 
+                  backgroundColor: isDraggingCategories ? accentColor : colors.surface,
+                  borderColor: accentColor,
+                  borderWidth: 1,
+                }
+              ]}
+            >
+              <MaterialIcons 
+                name="reorder" 
+                size={20} 
+                color={isDraggingCategories ? "#fff" : accentColor} 
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => setShowAddModal(true)}
+              style={[styles.addButton, { backgroundColor: accentColor }]}
+            >
+              <MaterialIcons name="add" size={24} color="#fff" />
+            </Pressable>
           </View>
+        </View>
+
+        {categories.length === 0 ? (
+          <ScrollView 
+            style={styles.content} 
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={accentColor}
+              />
+            }
+          >
+            <View style={styles.emptyState}>
+              <MaterialIcons name="inbox" size={48} color={textSecondary} />
+              <ThemedText type="subtitle" style={{ marginTop: Spacing.lg }}>
+                No categories yet
+              </ThemedText>
+              <ThemedText type="default" style={{ color: textSecondary, marginTop: Spacing.sm }}>
+                Add a category to get started
+              </ThemedText>
+            </View>
+          </ScrollView>
         ) : (
-          categories.map((category) => {
-            const isExpanded = expandedCategories.has(category.id);
-            const categoryTasks = getCategoryTasks(category.id);
+          <DraggableFlatList
+            data={categories}
+            onDragEnd={({ data }) => handleDragEndCategories(data)}
+            keyExtractor={(item) => item.id}
+            onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={accentColor}
+              />
+            }
+            renderItem={({ item: category, drag, isActive }: RenderItemParams<Category>) => {
+              const isExpanded = expandedCategories.has(category.id);
+              const categoryTasks = getCategoryTasks(category.id);
 
-            return (
-              <View key={category.id}>
-                {renderCategoryHeader(category)}
-                {isExpanded && categoryTasks.length > 0 && (
-                  <View style={{ backgroundColor: colors.background }}>
-                    {categoryTasks.map((task) => renderTaskItem(task))}
+              return (
+                <ScaleDecorator>
+                  <View key={category.id}>
+                    {renderCategoryHeader(category, isDraggingCategories ? drag : undefined, isActive)}
+                    {isExpanded && categoryTasks.length > 0 && (
+                      <View style={{ backgroundColor: colors.background }}>
+                        <DraggableFlatList
+                          data={categoryTasks}
+                          onDragEnd={({ data }) => handleDragEndTasks(category.id, data)}
+                          keyExtractor={(item) => item.id}
+                          onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                          renderItem={({ item: task, drag: dragTask, isActive: isTaskActive }: RenderItemParams<Task>) => (
+                            <ScaleDecorator>
+                              {renderTaskItem(task, dragTask, isTaskActive)}
+                            </ScaleDecorator>
+                          )}
+                        />
+                      </View>
+                    )}
+                    {isExpanded && categoryTasks.length === 0 && (
+                      <View style={[styles.emptyCategory, { backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.divider }]}>
+                        <ThemedText type="default" style={{ color: textSecondary }}>
+                          No tasks in this category
+                        </ThemedText>
+                      </View>
+                    )}
                   </View>
-                )}
-                {isExpanded && categoryTasks.length === 0 && (
-                  <View style={[styles.emptyCategory, { backgroundColor: colors.card, borderTopWidth: 1, borderTopColor: colors.divider }]}>
-                    <ThemedText type="default" style={{ color: textSecondary }}>
-                      No tasks in this category
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
-            );
-          })
+                </ScaleDecorator>
+              );
+            }}
+          />
         )}
-      </ScrollView>
 
-      <Modal
-        visible={showAddModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAddModal(false)}
-      >
+        <Modal
+          visible={showAddModal}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowAddModal(false)}
+        >
         <ThemedView style={styles.modalContainer}>
           <View
             style={[
@@ -393,6 +471,7 @@ export default function TodosScreen() {
         </ThemedView>
       </Modal>
     </ThemedView>
+    </GestureHandlerRootView>
   );
 }
 
@@ -408,6 +487,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.lg,
   },
   addButton: {
+    width: 48,
+    height: 48,
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  reorderButton: {
     width: 48,
     height: 48,
     borderRadius: BorderRadius.md,
