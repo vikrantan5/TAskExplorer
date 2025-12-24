@@ -27,6 +27,7 @@ interface TaskContextType {
   loading: boolean;
   addCategory: (title: string) => Promise<void>;
   addTask: (categoryId: string, title: string, isDaily: boolean) => Promise<void>;
+  updateTask: (taskId: string, title: string) => Promise<void>;
   toggleTask: (taskId: string) => Promise<void>;
   deleteTask: (taskId: string) => Promise<void>;
   deleteCategory: (categoryId: string) => Promise<void>;
@@ -259,6 +260,29 @@ export function TaskProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateTask = async (taskId: string, title: string) => {
+    if (!userId) return;
+
+    try {
+      const { error } = await supabase
+        .from("tasks")
+        .update({ title })
+        .eq("id", taskId);
+
+      if (error) throw error;
+
+      // Update local state
+      setTasks(
+        tasks.map((t) =>
+          t.id === taskId ? { ...t, title } : t
+        )
+      );
+    } catch (error) {
+      console.error("Error updating task:", error);
+      throw error;
+    }
+  };
+
   const toggleTask = async (taskId: string) => {
     if (!userId) return;
 
@@ -380,6 +404,7 @@ export function TaskProvider({ children }: { children: ReactNode }) {
         loading,
         addCategory,
         addTask,
+        updateTask,
         toggleTask,
         deleteTask,
         deleteCategory,

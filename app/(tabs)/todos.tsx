@@ -9,6 +9,7 @@ import {
   Switch,
   ScrollView,
   RefreshControl,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
@@ -26,10 +27,13 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 export default function TodosScreen() {
   const insets = useSafeAreaInsets();
   const colorScheme = useColorScheme();
-  const { categories, tasks, addCategory, addTask, toggleTask, deleteTask, syncData, reorderTasks, reorderCategories, loading } = useTaskContext();
+  const { categories, tasks, addCategory, addTask, updateTask, toggleTask, deleteTask, deleteCategory, syncData, reorderTasks, reorderCategories, loading } = useTaskContext();
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [newCategoryTitle, setNewCategoryTitle] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [editTaskTitle, setEditTaskTitle] = useState("");
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDaily, setIsDaily] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -82,6 +86,43 @@ export default function TodosScreen() {
     }
   };
 
+  const handleEditTask = async () => {
+    if (editTaskTitle.trim() && editingTask) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await updateTask(editingTask.id, editTaskTitle);
+      setEditTaskTitle("");
+      setEditingTask(null);
+      setShowEditModal(false);
+    }
+  };
+
+  const handleDeleteCategory = (categoryId: string, categoryTitle: string) => {
+    Alert.alert(
+      "Delete Category",
+      `Are you sure you want to delete "${categoryTitle}"? This will also delete all tasks in this category.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            await deleteCategory(categoryId);
+          },
+        },
+      ]
+    );
+  };
+
+  const openEditModal = (task: Task) => {
+    setEditingTask(task);
+    setEditTaskTitle(task.title);
+    setShowEditModal(true);
+  };
+
   const getCategoryTasks = (categoryId: string) => {
     return tasks.filter((task) => task.categoryId === categoryId);
   };
@@ -131,11 +172,23 @@ export default function TodosScreen() {
             {completedCount}/{categoryTasks.length} completed
           </ThemedText>
         </View>
-        <MaterialIcons
-          name={isExpanded ? "expand-less" : "expand-more"}
-          size={24}
-          color={accentColor}
-        />
+        <View style={{ flexDirection: "row", alignItems: "center", gap: Spacing.sm }}>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              handleDeleteCategory(category.id, category.title);
+            }}
+            style={styles.categoryDeleteButton}
+            data-testid={`category-delete-${category.id}`}
+          >
+            <MaterialIcons name="delete-outline" size={20} color={dangerColor} />
+          </Pressable>
+          <MaterialIcons
+            name={isExpanded ? "expand-less" : "expand-more"}
+            size={24}
+            color={accentColor}
+          />
+        </View>
       </Pressable>
     );
   };
@@ -207,6 +260,17 @@ export default function TodosScreen() {
               </ThemedText>
             )}
           </View>
+
+          <Pressable
+            onPress={async () => {
+              await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              openEditModal(task);
+            }}
+            style={styles.editButton}
+            data-testid={`task-edit-${task.id}`}
+          >
+            <MaterialIcons name="edit" size={18} color={accentColor} />
+          </Pressable>
 
           <Pressable
             onPress={async () => {
@@ -293,6 +357,10 @@ export default function TodosScreen() {
             onDragEnd={({ data }) => handleDragEndCategories(data)}
             keyExtractor={(item) => item.id}
             onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+            scrollEnabled={true}
+            style={{ flex: 1 }}
+            contentContainerStyle={{ flexGrow: 1 }}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -315,6 +383,8 @@ export default function TodosScreen() {
                           onDragEnd={({ data }) => handleDragEndTasks(category.id, data)}
                           keyExtractor={(item) => item.id}
                           onDragBegin={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)}
+                          nestedScrollEnabled={true}
+                          scrollEnabled={true}
                           renderItem={({ item: task, drag: dragTask, isActive: isTaskActive }: RenderItemParams<Task>) => (
                             <ScaleDecorator>
                               {renderTaskItem(task, dragTask, isTaskActive)}
@@ -470,6 +540,72 @@ export default function TodosScreen() {
           </View>
         </ThemedView>
       </Modal>
+
+      <Modal
+        visible={showEditModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowEditModal(false)}
+      >
+        <ThemedView style={styles.modalContainer}>
+          <View
+            style={[
+              styles.modalContent,
+              {
+                paddingTop: Math.max(insets.top, Spacing.lg),
+                paddingBottom: Math.max(insets.bottom, Spacing.lg),
+              },
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <ThemedText type="title" style={{ fontSize: 24 }}>
+                Edit Task
+              </ThemedText>
+              <Pressable onPress={() => setShowEditModal(false)}>
+                <MaterialIcons name="close" size={24} color={textColor} />
+              </Pressable>
+            </View>
+
+            <ScrollView style={styles.modalForm} showsVerticalScrollIndicator={false}>
+              <ThemedText type="default" style={{ marginTop: Spacing.lg }}>
+                Task Title
+              </ThemedText>
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    borderColor: colors.divider,
+                    color: textColor,
+                    backgroundColor: colors.surface,
+                    marginTop: Spacing.md,
+                  },
+                ]}
+                placeholder="Task title"
+                placeholderTextColor={textSecondary}
+                value={editTaskTitle}
+                onChangeText={setEditTaskTitle}
+                autoFocus
+              />
+
+              <Pressable
+                onPress={handleEditTask}
+                disabled={!editTaskTitle.trim()}
+                style={[
+                  styles.button,
+                  {
+                    backgroundColor: accentColor,
+                    opacity: !editTaskTitle.trim() ? 0.5 : 1,
+                  },
+                ]}
+              >
+                <ThemedText type="defaultSemiBold" style={{ color: "#fff" }}>
+                  Save Changes
+                </ThemedText>
+              </Pressable>
+            </ScrollView>
+          </View>
+        </ThemedView>
+      </Modal>
     </ThemedView>
     </GestureHandlerRootView>
   );
@@ -536,6 +672,13 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     padding: Spacing.sm,
+  },
+  editButton: {
+    padding: Spacing.sm,
+    marginRight: Spacing.xs,
+  },
+  categoryDeleteButton: {
+    padding: Spacing.xs,
   },
   emptyState: {
     justifyContent: "center",

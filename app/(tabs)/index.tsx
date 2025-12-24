@@ -1,21 +1,18 @@
 import { Image } from "expo-image";
 import { useRouter, Link } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet } from "react-native";
+import { useEffect } from "react";
+import { ActivityIndicator, Pressable, StyleSheet } from "react-native";
 
 import { HelloWave } from "@/components/hello-wave";
 import ParallaxScrollView from "@/components/parallax-scroll-view";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { getLoginUrl } from "@/constants/oauth";
 import { useAuth } from "@/hooks/use-auth";
 
 // This screen is no longer used - app now uses tab-based navigation
 // Keeping this file for reference
 export default function HomeScreen() {
   const { user, loading, isAuthenticated, logout } = useAuth();
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -29,99 +26,11 @@ export default function HomeScreen() {
 
   const handleLogin = async () => {
     try {
-      console.log("[Auth] Login button clicked");
-      setIsLoggingIn(true);
-      const loginUrl = getLoginUrl();
-      console.log("[Auth] Generated login URL:", loginUrl);
-
-      // On web, use direct redirect in same tab
-      // On mobile, use WebBrowser to open OAuth in a separate context
-      if (Platform.OS === "web") {
-        console.log("[Auth] Web platform: redirecting to OAuth in same tab...");
-        window.location.href = loginUrl;
-        return;
-      }
-
-      // Mobile: Open OAuth URL in browser
-      // The OAuth server will redirect to our deep link (manusapp://oauth/callback?code=...&state=...)
-      console.log("[Auth] Opening OAuth URL in browser...");
-      const result = await WebBrowser.openAuthSessionAsync(
-        loginUrl,
-        undefined, // Deep link is already configured in getLoginUrl, so no need to specify here
-        {
-          preferEphemeralSession: false,
-          showInRecents: true,
-        },
-      );
-
-      console.log("[Auth] WebBrowser result:", result);
-      if (result.type === "cancel") {
-        console.log("[Auth] OAuth cancelled by user");
-      } else if (result.type === "dismiss") {
-        console.log("[Auth] OAuth dismissed");
-      } else if (result.type === "success" && result.url) {
-        console.log("[Auth] OAuth session successful, navigating to callback:", result.url);
-        // Extract code and state from the URL
-        try {
-          // Parse the URL - it might be exp:// or a regular URL
-          let url: URL;
-          if (result.url.startsWith("exp://") || result.url.startsWith("exps://")) {
-            // For exp:// URLs, we need to parse them differently
-            // Format: exp://192.168.31.156:8081/--/oauth/callback?code=...&state=...
-            const urlStr = result.url.replace(/^exp(s)?:\/\//, "http://");
-            url = new URL(urlStr);
-          } else {
-            url = new URL(result.url);
-          }
-
-          const code = url.searchParams.get("code");
-          const state = url.searchParams.get("state");
-          const error = url.searchParams.get("error");
-
-          console.log("[Auth] Extracted params from callback URL:", {
-            code: code?.substring(0, 20) + "...",
-            state: state?.substring(0, 20) + "...",
-            error,
-          });
-
-          if (error) {
-            console.error("[Auth] OAuth error in callback:", error);
-            return;
-          }
-
-          if (code && state) {
-            // Navigate to callback route with params
-            console.log("[Auth] Navigating to callback route with params...");
-            router.push({
-              pathname: "/oauth/callback" as any,
-              params: { code, state },
-            });
-          } else {
-            console.error("[Auth] Missing code or state in callback URL");
-          }
-        } catch (err) {
-          console.error("[Auth] Failed to parse callback URL:", err, result.url);
-          // Fallback: try parsing with regex
-          const codeMatch = result.url.match(/[?&]code=([^&]+)/);
-          const stateMatch = result.url.match(/[?&]state=([^&]+)/);
-
-          if (codeMatch && stateMatch) {
-            const code = decodeURIComponent(codeMatch[1]);
-            const state = decodeURIComponent(stateMatch[1]);
-            console.log("[Auth] Fallback: extracted params via regex, navigating...");
-            router.push({
-              pathname: "/oauth/callback" as any,
-              params: { code, state },
-            });
-          } else {
-            console.error("[Auth] Could not extract code/state from URL");
-          }
-        }
-      }
+      console.log("[Auth] Login button clicked - redirecting to profile");
+      // Navigate to profile tab which has the login form
+      router.push("/profile");
     } catch (error) {
-      console.error("[Auth] Login error:", error);
-    } finally {
-      setIsLoggingIn(false);
+      console.error("[Auth] Navigation error:", error);
     }
   };
 
@@ -153,14 +62,9 @@ export default function HomeScreen() {
         ) : (
           <Pressable
             onPress={handleLogin}
-            disabled={isLoggingIn}
-            style={[styles.loginButton, isLoggingIn && styles.loginButtonDisabled]}
+            style={styles.loginButton}
           >
-            {isLoggingIn ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <ThemedText style={styles.loginText}>Login</ThemedText>
-            )}
+            <ThemedText style={styles.loginText}>Login</ThemedText>
           </Pressable>
         )}
       </ThemedView>
